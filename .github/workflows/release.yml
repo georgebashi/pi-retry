@@ -27,7 +27,7 @@ jobs:
         run: |
           PACKAGE_NAME=$(node -p "require('./package.json').name")
           PACKAGE_VERSION=$(node -p "require('./package.json').version")
-          NPM_VERSION=$(npm view "$PACKAGE_NAME" version 2>/dev/null || echo "0.0.0")
+          NPM_VERSION=$(npm view "$PACKAGE_NAME" version --registry https://registry.npmjs.org 2>/dev/null || echo "0.0.0")
           if [ "$PACKAGE_VERSION" = "$NPM_VERSION" ]; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
             echo "Version $PACKAGE_VERSION already published, skipping."
