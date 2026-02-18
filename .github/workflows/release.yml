@@ -1,0 +1,46 @@
+name: Release to npm
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+
+      - name: Check if version changed
+        id: version
+        run: |
+          PACKAGE_VERSION=$(node -p "require('./package.json').version")
+          NPM_VERSION=$(npm view pi-retry version 2>/dev/null || echo "0.0.0")
+          if [ "$PACKAGE_VERSION" = "$NPM_VERSION" ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "Version $PACKAGE_VERSION already published, skipping."
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "version=$PACKAGE_VERSION" >> "$GITHUB_OUTPUT"
+            echo "Publishing $PACKAGE_VERSION (npm has $NPM_VERSION)."
+          fi
+
+      - name: Publish to npm
+        if: steps.version.outputs.changed == 'true'
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Create GitHub release
+        if: steps.version.outputs.changed == 'true'
+        run: gh release create "v${{ steps.version.outputs.version }}" --generate-notes
+        env:
+          GH_TOKEN: ${{ github.token }}

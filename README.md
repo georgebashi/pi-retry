@@ -12,7 +12,7 @@ When an LLM response fails with a transient streaming error (e.g. `"aborted"` fr
 - **Max attempts:** 3
 - **No history pollution:** The failed response is invisible to the model (pi's `transform-messages` strips aborted/errored assistant messages). The retry trigger uses `display: false` so it's hidden in the TUI.
 
-Only errors *not* already handled by pi's built-in retry are retried (overloaded, rate limit, 429, 5xx, etc. are left to pi).
+Only errors *not* already handled by pi's built-in retry are retried (overloaded, rate limit, 429, 5xx, etc. are left to pi). User-initiated aborts (ESC) are never auto-retried — use `/retry` or Enter for those.
 
 ### Manual retry: `/retry`
 
@@ -34,12 +34,16 @@ Otherwise Enter behaves normally.
 
 ### As a pi package (recommended)
 
-Add to your `~/.pi/agent/settings.json`:
+```bash
+pi install /path/to/pi-retry
+```
+
+Or add it to your `~/.pi/agent/settings.json` manually:
 
 ```json
 {
-  "extensions": [
-    "/path/to/pi-retry/index.ts"
+  "packages": [
+    "/path/to/pi-retry"
   ]
 }
 ```
@@ -54,7 +58,7 @@ pi -e /path/to/pi-retry/index.ts
 
 Every retry attempt is logged to `~/.pi/logs/pi-retry.jsonl` with:
 
-- Provider, model, API type, thinking level
+- Provider, model, model ID, API type, thinking level
 - Stop reason and error message
 - Attempt number and delay
 - Working directory and session ID
