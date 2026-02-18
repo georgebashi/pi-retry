@@ -19,11 +19,15 @@ jobs:
           node-version: 22
           registry-url: https://registry.npmjs.org
 
+      - name: Install latest npm (trusted publishing requires >=11.5.1)
+        run: npm install -g npm@latest
+
       - name: Check if version changed
         id: version
         run: |
+          PACKAGE_NAME=$(node -p "require('./package.json').name")
           PACKAGE_VERSION=$(node -p "require('./package.json').version")
-          NPM_VERSION=$(npm view pi-retry version 2>/dev/null || echo "0.0.0")
+          NPM_VERSION=$(npm view "$PACKAGE_NAME" version 2>/dev/null || echo "0.0.0")
           if [ "$PACKAGE_VERSION" = "$NPM_VERSION" ]; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
             echo "Version $PACKAGE_VERSION already published, skipping."
@@ -36,8 +40,6 @@ jobs:
       - name: Publish to npm
         if: steps.version.outputs.changed == 'true'
         run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Create GitHub release
         if: steps.version.outputs.changed == 'true'

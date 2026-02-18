@@ -1,5 +1,5 @@
 {
-  "name": "pi-retry",
+  "name": "@georgebashi/pi-retry",
   "version": "0.1.0",
   "description": "pi extension: auto-retry transient streaming errors + /retry command",
   "keywords": ["pi-package", "retry", "streaming", "error-handling"],
