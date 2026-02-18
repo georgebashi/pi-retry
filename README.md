@@ -35,17 +35,13 @@ Otherwise Enter behaves normally.
 ### As a pi package (recommended)
 
 ```bash
-pi install /path/to/pi-retry
+pi install npm:@georgebashi/pi-retry
 ```
 
-Or add it to your `~/.pi/agent/settings.json` manually:
+Or from a local checkout:
 
-```json
-{
-  "packages": [
-    "/path/to/pi-retry"
-  ]
-}
+```bash
+pi install /path/to/pi-retry
 ```
 
 ### For development/testing
