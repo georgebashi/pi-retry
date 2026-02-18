@@ -1,0 +1,12 @@
+{
+  "name": "pi-retry",
+  "version": "0.1.0",
+  "description": "pi extension: auto-retry transient streaming errors + /retry command",
+  "type": "module",
+  "pi": {
+    "extensions": ["./index.ts"]
+  },
+  "dependencies": {
+    "@mariozechner/pi-coding-agent": "*"
+  }
+}
