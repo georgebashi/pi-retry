@@ -25,10 +25,11 @@ After an error or user-initiated abort (ESC), just press Enter on an empty edito
 This works by intercepting raw terminal input via pi's `onTerminalInput` hook. The Enter keypress is consumed only when all of these are true:
 
 - The editor is empty
+- The editor has focus (no modal/selector/overlay is open)
 - The agent is idle
 - The last response was an error or abort
 
-Otherwise Enter behaves normally.
+Otherwise Enter behaves normally — including when a model selector, confirm dialog, session picker, or any other modal UI is displayed.
 
 ## Installation
 

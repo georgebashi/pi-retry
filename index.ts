@@ -1,5 +1,5 @@
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { matchesKey } from "@mariozechner/pi-tui";
+import { matchesKey, type TUI } from "@mariozechner/pi-tui";
 import { appendFileSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -69,6 +69,11 @@ interface RetryLogEntry {
   delayMs?: number;
   cwd: string;
   sessionId?: string;
+  // Context size at the time of the event
+  contextTokens?: number | null;
+  contextWindow?: number;
+  contextPercent?: number | null;
+  messageCount?: number;
 }
 
 function logRetryEvent(entry: RetryLogEntry): void {
@@ -78,6 +83,38 @@ function logRetryEvent(entry: RetryLogEntry): void {
   } catch {
     // Best-effort — don't break the extension if logging fails.
   }
+}
+
+/** Extract context size fields from the extension context. */
+function getContextFields(ctx: any): Pick<RetryLogEntry, "contextTokens" | "contextWindow" | "contextPercent"> {
+  const usage = ctx.getContextUsage?.();
+  if (!usage) return {};
+  return {
+    contextTokens: usage.tokens,
+    contextWindow: usage.contextWindow,
+    contextPercent: usage.percent,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// TUI focus detection
+// ---------------------------------------------------------------------------
+
+/**
+ * Check if the editor is the currently focused component. Uses duck-typing
+ * against the TUI's (runtime-accessible) focusedComponent: editors have both
+ * `onSubmit` and `getText`, which no selector/dialog/overlay component does.
+ *
+ * When a modal UI is shown (model selector, confirm dialog, session picker,
+ * extension selector, overlay, etc.), focus moves away from the editor, and
+ * this returns false — preventing our Enter handler from stealing the keypress.
+ */
+function isEditorFocused(tui: TUI | null): boolean {
+  if (!tui) return false;
+  const focused = (tui as any).focusedComponent;
+  if (!focused) return false;
+  // Duck-type: the editor component has getText + onSubmit; selectors don't.
+  return typeof focused.getText === "function" && "onSubmit" in focused;
 }
 
 // ---------------------------------------------------------------------------
@@ -96,6 +133,9 @@ export default function piRetry(pi: ExtensionAPI) {
 
   // Track pending retry triggers so we can strip them from context.
   let pendingRetryCleanup = false;
+
+  // TUI reference, captured via a no-op widget during session_start.
+  let tuiRef: TUI | null = null;
 
   // -----------------------------------------------------------------------
   // Reset auto-retry counter on successful responses
@@ -125,6 +165,7 @@ export default function piRetry(pi: ExtensionAPI) {
           maxRetries: MAX_RETRIES,
           cwd: ctx.cwd,
           sessionId: ctx.sessionManager.getSessionId(),
+          ...getContextFields(ctx),
         });
 
         ctx.ui.notify(`Retry succeeded on attempt ${retryAttempt}.`, "info");
@@ -195,6 +236,8 @@ export default function piRetry(pi: ExtensionAPI) {
         maxRetries: MAX_RETRIES,
         cwd: ctx.cwd,
         sessionId: ctx.sessionManager.getSessionId(),
+        messageCount: messages.length,
+        ...getContextFields(ctx),
       });
 
       ctx.ui.notify(
@@ -225,6 +268,8 @@ export default function piRetry(pi: ExtensionAPI) {
       delayMs,
       cwd: ctx.cwd,
       sessionId: ctx.sessionManager.getSessionId(),
+      messageCount: messages.length,
+      ...getContextFields(ctx),
     });
 
     ctx.ui.setStatus(
@@ -267,6 +312,7 @@ export default function piRetry(pi: ExtensionAPI) {
         maxRetries: 1,
         cwd: ctx.cwd,
         sessionId: ctx.sessionManager.getSessionId(),
+        ...getContextFields(ctx),
       });
 
       triggerRetry(pi);
@@ -278,13 +324,31 @@ export default function piRetry(pi: ExtensionAPI) {
   // hook. When the editor is empty, the agent is idle, and the last
   // response was an error/abort, pressing Enter triggers a retry instead
   // of being swallowed as a no-op.
+  //
+  // We also check that the editor is the focused component. When a modal
+  // UI is displayed (model selector, confirm dialog, session picker, etc.)
+  // focus moves to the modal and we must NOT consume the Enter keypress —
+  // otherwise the modal can't be interacted with.
   // -----------------------------------------------------------------------
   pi.on("session_start", async (_event, ctx) => {
+    // Capture TUI reference via a zero-height widget factory. The factory
+    // is called once with the TUI instance; we stash it and return an
+    // invisible component (empty render, no height).
+    ctx.ui.setWidget("__pi-retry-tui-probe", (tui) => {
+      tuiRef = tui;
+      // Return a minimal no-op component that renders nothing.
+      return { render: () => [] };
+    }, { placement: "aboveEditor" });
+    // Remove the widget immediately — we only needed it to grab tui.
+    ctx.ui.setWidget("__pi-retry-tui-probe", undefined);
+
     ctx.ui.onTerminalInput((data) => {
       if (!matchesKey(data, "enter")) return;
       if (!lastResponseWasError) return;
       if (!ctx.isIdle()) return;
       if (ctx.ui.getEditorText().trim() !== "") return;
+      // Don't consume Enter when a modal/selector/overlay has focus.
+      if (!isEditorFocused(tuiRef)) return;
 
       // Consume the Enter keypress and trigger retry
       logRetryEvent({
@@ -299,6 +363,7 @@ export default function piRetry(pi: ExtensionAPI) {
         maxRetries: 1,
         cwd: ctx.cwd,
         sessionId: ctx.sessionManager.getSessionId(),
+        ...getContextFields(ctx),
       });
 
       triggerRetry(pi);
