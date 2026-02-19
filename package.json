@@ -1,8 +1,13 @@
 {
   "name": "@georgebashi/pi-retry",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "pi extension: auto-retry transient streaming errors + /retry command",
-  "keywords": ["pi-package", "retry", "streaming", "error-handling"],
+  "keywords": [
+    "pi-package",
+    "retry",
+    "streaming",
+    "error-handling"
+  ],
   "license": "MIT",
   "author": "George Bashi <george@bashi.co.uk>",
   "repository": {
@@ -16,7 +21,9 @@
     "LICENSE"
   ],
   "pi": {
-    "extensions": ["./index.ts"]
+    "extensions": [
+      "./index.ts"
+    ]
   },
   "peerDependencies": {
     "@mariozechner/pi-coding-agent": "*"
